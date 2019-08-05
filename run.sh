@@ -22,6 +22,11 @@ restart_crawlers() {
   docker kill $(docker ps -q)
   echo === Removing exited containers: ===
   docker rm $(docker ps -q -all)
+  if [ $LOCAL_IMAGE_HOUR != $REMOTE_IMAGE_HOUR ]
+  then
+          echo === Removing the old container ===
+          docker rmi clearlydefined/crawler:latest -f
+  fi
   echo === Starting $CRAWLERS_NUM containers: ===
   for ((i=0; i<$CRAWLERS_NUM; i++))
   do
