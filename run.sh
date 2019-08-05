@@ -21,7 +21,7 @@ restart_crawlers() {
   echo === Killing Docker containers: ===
   docker kill $(docker ps -q)
   echo === Removing exited containers: ===
-  docker rm $(docker ps -q -f status=exited)
+  docker rm $(docker ps -q -all)
   echo === Starting $CRAWLERS_NUM containers: ===
   for ((i=0; i<$CRAWLERS_NUM; i++))
   do
