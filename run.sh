@@ -46,8 +46,8 @@ restart_crawlers() {
   done
 }
 
-# Restart crawlers if there are no/too few running crawlers or there is a new image or every 4 hours:
-if (( $RUNNING_NODE_PROCS < 10)) || [ $LOCAL_IMAGE_HOUR != $REMOTE_IMAGE_HOUR ] || (( $CURRENT_HOUR % 4 == 0 ))
+# Restart crawlers if there are no/too few running crawlers or there is a new image or every few hours:
+if (( $RUNNING_NODE_PROCS < 10)) || [ $LOCAL_IMAGE_HOUR != $REMOTE_IMAGE_HOUR ] || (( $CURRENT_HOUR % 8 == 0 ))
 then
         restart_crawlers
 else
