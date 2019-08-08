@@ -32,7 +32,8 @@ restart_crawlers() {
   for ((i=0; i<$CRAWLERS_NUM; i++))
   do
         docker run \
-                --restart=always \
+                --rm \
+                #--restart=always \
                 --detach \
                 -e CRAWLER_AZBLOB_CONNECTION_STRING='<secret>' \
                 -e CRAWLER_GITHUB_TOKEN='<secret>' \
