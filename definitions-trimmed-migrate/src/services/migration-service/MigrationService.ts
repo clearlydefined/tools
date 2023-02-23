@@ -24,8 +24,6 @@ export class MigrationService {
             const blobNames = await this.blobService.getAllBlobNames();
 
             await this.migrateBlobsToTrimmed(blobNames);
-
-            debugger;
         } catch (err) {
             console.error(`MigrationService.migrateDefinitionsPagedToBlob - ${err}`);
             throw err;
