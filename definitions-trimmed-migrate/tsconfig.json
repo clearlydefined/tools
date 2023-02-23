@@ -1,0 +1,20 @@
+{
+    "compilerOptions": {
+        "target": "ES2020" /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */,
+        "lib": [
+            "ESNext"
+        ] /* Specify a set of bundled library declaration files that describe the target runtime environment. */,
+        "module": "NodeNext" /* Specify what module code is generated. */,
+        "moduleResolution": "NodeNext",
+        "sourceMap": true,
+        "rootDir": "./src" /* Specify the root folder within your source files. */,
+        "resolveJsonModule": true /* Enable importing .json files. */,
+        "allowJs": true /* Allow JavaScript files to be a part of your program. Use the 'checkJS' option to get errors from these files. */,
+        "outDir": "dist" /* Specify an output folder for all emitted files. */,
+        "forceConsistentCasingInFileNames": true /* Ensure that casing is correct in imports. */,
+        "strict": true /* Enable all strict type-checking options. */,
+        "noImplicitAny": true /* Enable error reporting for expressions and declarations with an implied 'any' type. */,
+        "skipLibCheck": true /* Skip type checking all .d.ts files. */
+    },
+    "include": ["src/**/*"]
+}
