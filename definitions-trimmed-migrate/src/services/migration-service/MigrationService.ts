@@ -1,4 +1,5 @@
 import { AzureBlobService } from '../blob-service/BlobService';
+import { LogService } from '../log-service/LogService';
 import { MongoService } from '../mongo-service/MongoService';
 import { RedisService } from '../redis-service/RedisService';
 import {
@@ -14,18 +15,26 @@ export class MigrationService {
         private options: MigrationServiceOptions,
         private mongoService: MongoService,
         private redisService: RedisService,
-        private blobService: AzureBlobService
+        private blobService: AzureBlobService,
+        private logService: LogService
     ) {}
 
     public async start() {
-        console.log('Starting Migration service');
+        this.logService.log('MigrationService.start', 'Starting Migration service');
 
         try {
             const blobNames = await this.blobService.getAllBlobNames();
 
             await this.migrateBlobsToTrimmed(blobNames);
         } catch (err) {
-            console.error(`MigrationService.migrateDefinitionsPagedToBlob - ${err}`);
+            this.logService.error(
+                'MigrationService.start',
+                'Failed to migrate blobs to definitions-trimmed',
+                {
+                    exception: err as Error,
+                }
+            );
+
             throw err;
         }
     }
@@ -33,7 +42,10 @@ export class MigrationService {
     private async migrateBlobsToTrimmed(blobNames: string[]) {
         const migrationStartTime = Date.now();
 
-        console.log(`Migrating ${blobNames.length} definition blobs to definitions-trimmed`);
+        this.logService.log(
+            'MigrationService.migrateBlobsToTrimmed',
+            `Migrating ${blobNames.length} definition blobs to definitions-trimmed`
+        );
 
         let blobsMigrated = 0;
 
@@ -46,8 +58,10 @@ export class MigrationService {
 
             if (
                 this.wasUpdatedAfterMigrationStart(migrationStartTime, definitionBlob._meta.updated)
-            )
+            ) {
+                await this.redisService.set(blobName, 1);
                 continue;
+            }
 
             const _id = this.getIdFromCoordinates(definitionBlob.coordinates);
             const definitionDocument = await this.getDefinitionById(_id);
@@ -56,7 +70,12 @@ export class MigrationService {
                 await this.storeDefinition(_id, definitionBlob);
             }
 
-            console.log(`Processed ${++blobsMigrated}/${blobNames.length} blobs`);
+            this.logService.log(
+                'MigrationService.migrateBlobsToTrimmed',
+                `Processed ${++blobsMigrated}/${blobNames.length} blobs`
+            );
+
+            await this.redisService.set(blobName, 1);
         }
     }
 

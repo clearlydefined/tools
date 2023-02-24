@@ -1,12 +1,13 @@
 import { Db, MongoClient } from 'mongodb';
 
+import { LogService } from '../log-service/LogService';
 import { MongoOptions } from './types';
 
 export class MongoService {
     private client: MongoClient;
     private db: Db;
 
-    constructor(private options: MongoOptions) {
+    constructor(private options: MongoOptions, private logService: LogService) {
         this.client = new MongoClient(this.options.connectionString);
         this.db = this.client.db(this.options.dbName);
     }
@@ -15,10 +16,11 @@ export class MongoService {
         try {
             await this.client.connect();
 
-            console.log('Connected to MongoDB');
+            this.logService.log('MongoService.connect', 'Connected to MongoDB');
         } catch (err) {
-            console.error('Failed to connect to MongoDB');
-            console.error(err);
+            this.logService.error('MongoService.connect', 'Failed to connect to MongoDB', {
+                exception: err as Error,
+            });
 
             throw err;
         }
@@ -28,20 +30,24 @@ export class MongoService {
         try {
             await this.client.close();
 
-            console.log('Disconnected from MongoDB');
+            this.logService.log('MongoService.disconnect', 'Disconnected from MongoDB');
         } catch (err) {
-            console.error('Failed to disconnect from MongoDB');
-            console.error(err);
+            this.logService.error('MongoService.disconnect', 'Failed to disconnect from MongoDB', {
+                exception: err as Error,
+            });
+
+            throw err;
         }
     }
 
     public async findOne<T>(collection: string, query: Object) {
         try {
-            const document = await this.db.collection(collection).findOne<T>(query);
-
-            return document;
+            return await this.db.collection(collection).findOne<T>(query);
         } catch (err) {
-            console.error(`MongoService.get - ${err}`);
+            this.logService.error('MongoService.findOne', 'Failed to findOne', {
+                exception: err as Error,
+            });
+
             throw err;
         }
     }
@@ -50,7 +56,10 @@ export class MongoService {
         try {
             await this.db.collection(collection).insertOne(data);
         } catch (err) {
-            console.error(`MongoService.store - ${err}`);
+            this.logService.error('MongoService.storeOne', 'Failed to storeOne', {
+                exception: err as Error,
+            });
+
             throw err;
         }
     }

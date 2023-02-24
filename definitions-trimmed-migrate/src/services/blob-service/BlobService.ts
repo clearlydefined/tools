@@ -1,12 +1,13 @@
 import { BlobServiceClient, ContainerClient } from '@azure/storage-blob';
 
+import { LogService } from '../log-service/LogService';
 import { AzureBlobServiceOptions } from './types';
 
 export class AzureBlobService {
     private blobServiceClient: BlobServiceClient;
     private containerClient: ContainerClient;
 
-    constructor(private options: AzureBlobServiceOptions) {
+    constructor(private options: AzureBlobServiceOptions, private logService: LogService) {
         this.blobServiceClient = BlobServiceClient.fromConnectionString(
             this.options.connectionString
         );
@@ -20,14 +21,21 @@ export class AzureBlobService {
         const blobNames: string[] = [];
         let i = 1;
 
-        for await (const blob of this.containerClient.listBlobsFlat()) {
-            blobNames.push(blob.name);
-            console.log(`Iterated ${i++} blobs`);
+        try {
+            for await (const blob of this.containerClient.listBlobsFlat()) {
+                blobNames.push(blob.name);
 
-            if (i === 100) break;
+                this.logService.log('AzureBlobservice.getAllBlobNames', `Iterated ${i++} blobs`);
+            }
+
+            return blobNames;
+        } catch (err) {
+            this.logService.error('AzureBlobservice.getAllBlobNames', 'Failed to getAllBlobNames', {
+                exception: err as Error,
+            });
+
+            throw err;
         }
-
-        return blobNames;
     }
 
     public async downloadBlob(blobName: string) {
@@ -40,7 +48,10 @@ export class AzureBlobService {
 
             return JSON.parse(readableBlob as string);
         } catch (err) {
-            console.error(`AzureBlobService.downloadBlob - ${err}`);
+            this.logService.error('AzureBlobservice.downloadBlob', 'Failed to download blob', {
+                exception: err as Error,
+            });
+
             throw err;
         }
     }

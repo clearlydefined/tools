@@ -1,4 +1,5 @@
 import { AzureBlobServiceOptions } from '../services/blob-service/types';
+import { LogService } from '../services/log-service/LogService';
 import { MigrationServiceOptions } from '../services/migration-service/types';
 import { MongoOptions } from '../services/mongo-service/types';
 import { RedisOptions } from '../services/redis-service/types';
@@ -20,12 +21,12 @@ export const config: AppConfig = {
         definitionsTrimmedCollectionName: process.env.MONGO_COLLECTION_NAME,
     } as MigrationServiceOptions,
     appInsightsOptions: {
-        connectionString: process.env.APP_INSIGHTS_CONNECTION_STRING,
+        connectionString: process.env.APPLICATIONINSIGHTS_CONNECTION_STRING,
     } as { connectionString: string },
 };
 
-export const validateAppConfig = (config: AppConfig) => {
-    console.log('Validating app config ');
+export const validateAppConfig = (config: AppConfig, logService: LogService) => {
+    logService.log('AppConfig.validateAppConfig', 'Validating app config');
 
     try {
         Object.entries(config).forEach(([domain, options]) => {
@@ -41,9 +42,12 @@ export const validateAppConfig = (config: AppConfig) => {
             }
         });
 
-        console.log('App config valiated');
+        logService.log('AppConfig.validateAppConfig', 'App config valiated');
     } catch (err) {
-        console.error('Error validating app config', err);
+        logService.error('AppConfig.validateAppConfig', 'Error validating app config', {
+            exception: err as Error,
+        });
+
         throw err;
     }
 };
