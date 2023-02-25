@@ -1,5 +1,4 @@
-import { createClient } from 'redis';
-import { RedisClientType } from '@redis/client';
+import { RedisClientType, createClient } from '@redis/client';
 
 import { RedisOptions } from './types';
 import { LogService } from '../log-service/LogService';
@@ -8,7 +7,15 @@ export class RedisService {
     private redisClient: RedisClientType;
 
     constructor(private options: RedisOptions, private logService: LogService) {
-        this.redisClient = createClient({ url: this.options.redisConnectionString });
+        const { url, password } = this.options;
+
+        this.redisClient = createClient({ url, password });
+
+        this.redisClient.on('error', (err) => {
+            this.logService.error('RedisService.error', err, {
+                exception: err as Error,
+            });
+        });
     }
 
     public async connect() {
@@ -17,7 +24,7 @@ export class RedisService {
 
             this.logService.log('RedisService.connect', 'Connected to Redis');
         } catch (err) {
-            this.logService.error('RedisService.connect', 'Failed to connect to Redis', {
+            this.logService.error('RedisService.connect', err, {
                 exception: err as Error,
             });
 
@@ -31,7 +38,7 @@ export class RedisService {
 
             this.logService.log('RedisService.disconnect', 'Disconnected from Redis');
         } catch (err) {
-            this.logService.error('RedisService.connect', 'Failed to disconnect from Redis', {
+            this.logService.error('RedisService.connect', err, {
                 exception: err as Error,
             });
 
@@ -43,7 +50,7 @@ export class RedisService {
         try {
             return await this.redisClient.get(key);
         } catch (err) {
-            this.logService.error('RedisService.get', 'Failed to get key', {
+            this.logService.error('RedisService.get', err, {
                 exception: err as Error,
             });
         }
@@ -53,7 +60,17 @@ export class RedisService {
         try {
             await this.redisClient.set(key, value);
         } catch (err) {
-            this.logService.error('RedisService.set', 'Failed to set key and value', {
+            this.logService.error('RedisService.set', err, {
+                exception: err as Error,
+            });
+        }
+    }
+
+    public async delete(key: string) {
+        try {
+            await this.redisClient.del(key);
+        } catch (err) {
+            this.logService.error('RedisService.delete', err, {
                 exception: err as Error,
             });
         }

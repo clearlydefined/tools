@@ -2,33 +2,40 @@ import { MongoService } from './services/mongo-service/MongoService';
 import { RedisService } from './services/redis-service/RedisService';
 import { MigrationService } from './services/migration-service/MigrationService';
 import { AppConfig } from './config/types';
-import { AzureBlobService } from './services/blob-service/BlobService';
+import { AzureStorageService } from './services/azure-storage-service/AzureStorageService';
 import { LogService } from './services/log-service/LogService';
+import { MigrationServiceProcess } from './services/migration-service/types';
 
 export const app = async (config: AppConfig, logService: LogService) => {
-    let startTime = Date.now();
-
+    const startTime = Date.now();
     const mongoService = new MongoService(config.mongoOptions, logService);
     const redisService = new RedisService(config.redisOptions, logService);
-    const blobService = new AzureBlobService(config.azureBlobServiceOptions, logService);
+    const azureStorageService = new AzureStorageService(
+        config.azureStorageOptions,
+        redisService,
+        logService
+    );
     const migrationService = new MigrationService(
-        config.migrationOptions,
+        config,
         mongoService,
         redisService,
-        blobService,
+        azureStorageService,
         logService
     );
 
     try {
         await mongoService.connect();
         await redisService.connect();
-        await migrationService.start();
+
+        await migrationService.start(config.migrationOptions.process as MigrationServiceProcess);
     } catch (err) {
-        logService.error('App', 'Exception', { exception: err as Error });
+        logService.error('App.Exception', err, { exception: err as Error });
     } finally {
         await mongoService.disconnect();
         await redisService.disconnect();
 
         logService.log('App', `Migration completed in ${(Date.now() - startTime) / 1000} seconds`);
+
+        process.kill(process.pid, 'SIGINT');
     }
 };

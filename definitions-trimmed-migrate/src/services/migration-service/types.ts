@@ -1,6 +1,7 @@
-export type MigrationServiceOptions = {
-    definitionsTrimmedCollectionName: string;
-};
+export enum MigrationServiceProcess {
+    BlobIterator = 'blob_iterator',
+    BlobProcessor = 'blob_processor',
+}
 
 export type Definition = {
     _meta: {

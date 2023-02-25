@@ -1,0 +1,6 @@
+{
+    "appService.showBuildDuringDeployPrompt": false,
+    "appService.zipIgnorePattern": ["src{,/**}", ".vscode{,/**}", ".env{,/**}", "tsconfig{,/**}"],
+    "appService.deploySubpath": ".",
+    "appService.defaultWebAppToDeploy": "None"
+}

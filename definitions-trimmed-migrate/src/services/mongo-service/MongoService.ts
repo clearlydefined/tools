@@ -18,7 +18,7 @@ export class MongoService {
 
             this.logService.log('MongoService.connect', 'Connected to MongoDB');
         } catch (err) {
-            this.logService.error('MongoService.connect', 'Failed to connect to MongoDB', {
+            this.logService.error('MongoService.connect', err, {
                 exception: err as Error,
             });
 
@@ -32,7 +32,7 @@ export class MongoService {
 
             this.logService.log('MongoService.disconnect', 'Disconnected from MongoDB');
         } catch (err) {
-            this.logService.error('MongoService.disconnect', 'Failed to disconnect from MongoDB', {
+            this.logService.error('MongoService.disconnect', err, {
                 exception: err as Error,
             });
 
@@ -44,7 +44,7 @@ export class MongoService {
         try {
             return await this.db.collection(collection).findOne<T>(query);
         } catch (err) {
-            this.logService.error('MongoService.findOne', 'Failed to findOne', {
+            this.logService.error('MongoService.findOne', err, {
                 exception: err as Error,
             });
 
@@ -56,7 +56,19 @@ export class MongoService {
         try {
             await this.db.collection(collection).insertOne(data);
         } catch (err) {
-            this.logService.error('MongoService.storeOne', 'Failed to storeOne', {
+            this.logService.error('MongoService.storeOne', err, {
+                exception: err as Error,
+            });
+
+            throw err;
+        }
+    }
+
+    public async upsert<T>(collection: string, query: any, data: T) {
+        try {
+            await this.db.collection(collection).updateOne(query, { $set: data }, { upsert: true });
+        } catch (err) {
+            this.logService.error('MongoService.upsert', err, {
                 exception: err as Error,
             });
 

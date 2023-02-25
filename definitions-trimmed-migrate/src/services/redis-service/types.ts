@@ -1,3 +1,4 @@
 export type RedisOptions = {
-    redisConnectionString: string;
+    url: string;
+    password: string;
 };
