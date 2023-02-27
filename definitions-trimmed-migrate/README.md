@@ -4,7 +4,7 @@
 
 Migrate all blob records to definitions-trimmed collection if record does not yet exist in definitions-trimmed collection
 
-## ![System](migration-strategy.png)
+## ![System](data-migration-strategy.png)
 
 ## App Insights log contexts
 
