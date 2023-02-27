@@ -41,7 +41,6 @@ export class MigrationService {
     }
 
     private async processQueuedBlobs() {
-        const migrationStartTime = Date.now();
         let blobsMigrated = 0;
 
         this.logService.log(
@@ -61,11 +60,26 @@ export class MigrationService {
                     const blobName = message.messageText;
 
                     const definitionBlob = await this.downloadBlob(blobName);
-                    const { _meta, coordinates } = definitionBlob;
 
-                    if (!this.wasUpdatedAfterMigrationStart(migrationStartTime, _meta.updated)) {
-                        const _id = this.getIdFromCoordinates(coordinates);
+                    // Handles a rare edge-case where a blob was deleted
+                    // after it was queued by the blob-iterator
+                    if (!definitionBlob) {
+                        const error = new Error(`Blob ${blobName} no longer exists`);
 
+                        this.logService.error('RedisService.get', error, {
+                            exception: error,
+                        });
+
+                        await this.markProcessed(blobName, message);
+
+                        continue;
+                    }
+
+                    const { coordinates } = definitionBlob;
+                    const _id = this.getIdFromCoordinates(coordinates);
+                    const definitionAlreadyExists = await this.getDefinitionById(_id);
+
+                    if (!definitionAlreadyExists) {
                         await this.storeDefinition(_id, definitionBlob);
                     }
 
@@ -88,7 +102,7 @@ export class MigrationService {
     }
 
     private async markProcessed(blobName: string, message: DequeuedMessageItem) {
-        await this.redisService.delete(blobName);
+        await this.redisService.set(blobName, 0);
         await this.azureStorageService.deleteMessage(message);
     }
 
@@ -100,8 +114,12 @@ export class MigrationService {
         return await this.azureStorageService.receiveMessages(Number(batchSize));
     }
 
-    private wasUpdatedAfterMigrationStart(migrationStartTime: number, lastUpdatedDate: string) {
-        return Date.parse(lastUpdatedDate) > migrationStartTime;
+    private async getDefinitionById(_id: string) {
+        const document = await this.mongoService.findOne(this.options.mongoOptions.collectionName, {
+            _id,
+        });
+
+        return document;
     }
 
     private async storeDefinition(_id: string, definitionBlob: DefinitionBlob) {
