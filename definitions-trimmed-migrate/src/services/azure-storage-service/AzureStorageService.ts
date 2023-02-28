@@ -39,9 +39,12 @@ export class AzureStorageService {
                 const { name, properties } = blob;
                 const { lastModified } = properties;
 
-                if (lastModified < startTime && !(await this.redisService.get(name))) {
+                const cachedBlobName = await this.redisService.get(name);
+
+                if (lastModified < startTime && cachedBlobName === null) {
                     await this.queueMessage(name);
                     await this.redisService.set(name, 1);
+
                     queued++;
                 }
 
@@ -71,7 +74,8 @@ export class AzureStorageService {
 
     private async queueMessage(message: string) {
         try {
-            await this.queueClient.sendMessage(message);
+            // 900 seconds = 15 min timeout
+            await this.queueClient.sendMessage(message, { visibilityTimeout: 900 });
         } catch (err) {
             this.logService.error('AzureStorageService.queueMessage', err, {
                 exception: err as Error,

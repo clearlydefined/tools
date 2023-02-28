@@ -9,6 +9,8 @@ import { RedisService } from '../redis-service/RedisService';
 import { ComponentCoordinates, Definition, DefinitionBlob, MigrationServiceProcess } from './types';
 
 export class MigrationService {
+    private blobsMigrated = 0;
+
     constructor(
         private options: AppConfig,
         private mongoService: MongoService,
@@ -41,8 +43,6 @@ export class MigrationService {
     }
 
     private async processQueuedBlobs() {
-        let blobsMigrated = 0;
-
         this.logService.log(
             'MigrationService.processQueuedBlobs',
             'Starting to process queued blobs'
@@ -84,11 +84,6 @@ export class MigrationService {
                     }
 
                     await this.markProcessed(blobName, message);
-
-                    this.logService.log(
-                        'MigrationService.processQueuedBlobs',
-                        `Processed ${blobName}. ${++blobsMigrated} total blobs have been processed`
-                    );
                 }
             } else {
                 this.logService.log(
@@ -104,6 +99,11 @@ export class MigrationService {
     private async markProcessed(blobName: string, message: DequeuedMessageItem) {
         await this.redisService.set(blobName, 0);
         await this.azureStorageService.deleteMessage(message);
+
+        this.logService.log(
+            'MigrationService.processQueuedBlobs',
+            `Processed ${blobName}. ${++this.blobsMigrated} total blobs have been processed`
+        );
     }
 
     private async downloadBlob(blobName: string): Promise<DefinitionBlob> {
@@ -115,11 +115,9 @@ export class MigrationService {
     }
 
     private async getDefinitionById(_id: string) {
-        const document = await this.mongoService.findOne(this.options.mongoOptions.collectionName, {
+        return await this.mongoService.findOne(this.options.mongoOptions.collectionName, {
             _id,
         });
-
-        return document;
     }
 
     private async storeDefinition(_id: string, definitionBlob: DefinitionBlob) {
