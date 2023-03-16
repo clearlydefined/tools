@@ -135,6 +135,6 @@ export class MigrationService {
 
     private getIdFromCoordinates(coordinates: ComponentCoordinates) {
         const { type, provider, namespace, name, revision } = coordinates;
-        return `${type}/${provider}/${namespace}/${name}/${revision}`;
+        return `${type}/${provider}/${namespace ?? '-'}/${name}/${revision}`;
     }
 }
