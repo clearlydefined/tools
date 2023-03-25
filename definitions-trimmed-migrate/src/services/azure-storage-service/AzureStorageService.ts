@@ -1,5 +1,6 @@
 import { BlobServiceClient, ContainerClient } from '@azure/storage-blob';
 import { DequeuedMessageItem, QueueClient, QueueServiceClient } from '@azure/storage-queue';
+import throat from 'throat';
 
 import { LogService } from '../log-service/LogService';
 import { RedisService } from '../redis-service/RedisService';
@@ -8,7 +9,8 @@ import { AzureStorageOptions } from './types';
 export class AzureStorageService {
     private blobServiceClient: BlobServiceClient;
     private containerClient: ContainerClient;
-    private queueClient: QueueClient;
+    private definitionsTrimmedQueueClient: QueueClient;
+    private definitionsToLowercaseQueueClient: QueueClient;
 
     constructor(
         private options: AzureStorageOptions,
@@ -23,12 +25,105 @@ export class AzureStorageService {
             this.options.blobContainerName
         );
 
-        this.queueClient = QueueServiceClient.fromConnectionString(
+        this.definitionsTrimmedQueueClient = QueueServiceClient.fromConnectionString(
             this.options.queueConnectionString,
             { retryOptions: { maxTries: 4 } }
         ).getQueueClient(this.options.queueName);
+
+        this.definitionsToLowercaseQueueClient = QueueServiceClient.fromConnectionString(
+            this.options.queueConnectionString,
+            { retryOptions: { maxTries: 4 } }
+        ).getQueueClient(this.options.queueDefinitionsToLowercaseName);
     }
 
+    // probably should have been split with MigrationService
+    public async iterateAndQueueBlobsByType(componentType: string) {
+        const startTime = new Date();
+        let totalIterated = 0;
+        let totalQueued = 0;
+        let nextContinuationToken = undefined;
+
+        try {
+            for await (const blobResponse of this.containerClient
+                .listBlobsFlat({ prefix: componentType })
+                .byPage({ maxPageSize: 1000, continuationToken: nextContinuationToken })) {
+                const { continuationToken, segment } = blobResponse;
+                const blobsNamesToProcess: string[] = [];
+
+                if (continuationToken) {
+                    nextContinuationToken = continuationToken;
+                }
+
+                if (segment.blobItems.length) {
+                    const cachedBlobValues = await Promise.all(
+                        segment.blobItems.map(
+                            throat(50, (blob) => {
+                                const { name } = blob;
+
+                                return this.redisService.get(name);
+                            })
+                        )
+                    );
+
+                    cachedBlobValues.forEach((cachedBlobValue, i) => {
+                        const { name, properties } = segment.blobItems[i];
+                        const { lastModified } = properties;
+
+                        if (lastModified < startTime && cachedBlobValue === null) {
+                            blobsNamesToProcess.push(name);
+                        }
+                    });
+
+                    if (blobsNamesToProcess.length) {
+                        await Promise.all(
+                            blobsNamesToProcess.map(
+                                throat(50, (blobsNameToProcess) => {
+                                    this.logService.log(
+                                        'AzureStorageService.iterateAndQueueBlobsByType',
+                                        `Queued ${blobsNameToProcess}`
+                                    );
+
+                                    totalQueued++;
+
+                                    return this.queueMessage(blobsNameToProcess);
+                                })
+                            )
+                        );
+
+                        await Promise.all(
+                            blobsNamesToProcess.map(
+                                throat(50, (blobsNameToProcess) => {
+                                    this.logService.log(
+                                        'AzureStorageService.iterateAndQueueBlobsByType',
+                                        `Set redis ${blobsNameToProcess}`
+                                    );
+
+                                    return this.redisService.set(blobsNameToProcess, 1);
+                                })
+                            )
+                        );
+                    }
+                }
+
+                totalIterated += segment.blobItems.length;
+
+                this.logService.log(
+                    'AzureStorageService.iterateAndQueueBlobsByType',
+                    `Iterated ${totalIterated} total blobs and queued ${totalQueued} blobs to be processed.`
+                );
+            }
+
+            console.log('done');
+        } catch (err) {
+            this.logService.error('AzureStorageService.iterateAndQueueAllBlobs', err, {
+                exception: err as Error,
+            });
+
+            throw err;
+        }
+    }
+
+    // probably should have been split with MigrationService
     public async iterateAndQueueAllBlobs() {
         const startTime = new Date();
         let i = 1;
@@ -62,20 +157,36 @@ export class AzureStorageService {
         }
     }
 
-    public async receiveMessages(count: number) {
+    public async receiveMessages(count: number, client = 'definitionsTrimmedQueueClient') {
         try {
-            return await this.queueClient.receiveMessages({ numberOfMessages: count });
+            if (client === 'definitionsTrimmedQueueClient') {
+                return await this.definitionsTrimmedQueueClient.receiveMessages({
+                    numberOfMessages: count,
+                });
+            } else if (client === 'definitionsToLowercaseQueueClient') {
+                return await this.definitionsToLowercaseQueueClient.receiveMessages({
+                    numberOfMessages: count,
+                });
+            }
         } catch (err) {
-            this.logService.error('AzureStorageService.peekQueue', err, {
+            this.logService.error('AzureStorageService.receiveMessages', err, {
                 exception: err as Error,
             });
         }
     }
 
-    private async queueMessage(message: string) {
+    public async queueMessage(message: string, client = 'definitionsTrimmedQueueClient') {
         try {
-            // 900 seconds = 15 min timeout
-            await this.queueClient.sendMessage(message, { visibilityTimeout: 900 });
+            if (client === 'definitionsTrimmedQueueClient') {
+                // 900 seconds = 15 min timeout
+                await this.definitionsTrimmedQueueClient.sendMessage(message, {
+                    visibilityTimeout: 900,
+                });
+            } else if (client === 'definitionsToLowercaseQueueClient') {
+                await this.definitionsToLowercaseQueueClient.sendMessage(message, {
+                    visibilityTimeout: 900,
+                });
+            }
         } catch (err) {
             this.logService.error('AzureStorageService.queueMessage', err, {
                 exception: err as Error,
@@ -83,11 +194,18 @@ export class AzureStorageService {
         }
     }
 
-    public async deleteMessage(message: DequeuedMessageItem) {
+    public async deleteMessage(
+        message: DequeuedMessageItem,
+        client = 'definitionsTrimmedQueueClient'
+    ) {
         const { messageId, popReceipt } = message;
 
         try {
-            await this.queueClient.deleteMessage(messageId, popReceipt);
+            if (client === 'definitionsTrimmedQueueClient') {
+                await this.definitionsTrimmedQueueClient.deleteMessage(messageId, popReceipt);
+            } else if (client === 'definitionsToLowercaseQueueClient') {
+                await this.definitionsToLowercaseQueueClient.deleteMessage(messageId, popReceipt);
+            }
         } catch (err) {
             this.logService.error('AzureStorageService.deleteMessage', err, {
                 exception: err as Error,

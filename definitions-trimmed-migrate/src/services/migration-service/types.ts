@@ -1,7 +1,21 @@
 export enum MigrationServiceProcess {
     BlobIterator = 'blob_iterator',
     BlobProcessor = 'blob_processor',
+    BatchBlobProcessor = 'blob_processor_batch',
+    BlobIteratorByType = 'blob_iterator_by_type',
+    RemoveUndefineds = 'remove_undefineds',
+    FindUppercasedIds = 'find_uppercased_ids',
+    DeleteQueuedUppercasedIds = 'delete_queued_uppercased_ids',
 }
+
+export type MigrationServiceOptions = {
+    process: MigrationServiceProcess;
+    componentType: string;
+};
+
+export type DefinitionTrimmed = Definition & {
+    _id: string;
+};
 
 export type Definition = {
     _meta: {
