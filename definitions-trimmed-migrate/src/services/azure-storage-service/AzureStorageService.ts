@@ -48,7 +48,7 @@ export class AzureStorageService {
                 .listBlobsFlat({ prefix: componentType })
                 .byPage({ maxPageSize: 1000, continuationToken: nextContinuationToken })) {
                 const { continuationToken, segment } = blobResponse;
-                const blobsNamesToProcess: string[] = [];
+                const blobNamesToProcess: string[] = [];
 
                 if (continuationToken) {
                     nextContinuationToken = continuationToken;
@@ -70,35 +70,35 @@ export class AzureStorageService {
                         const { lastModified } = properties;
 
                         if (lastModified < startTime && cachedBlobValue === null) {
-                            blobsNamesToProcess.push(name);
+                            blobNamesToProcess.push(name);
                         }
                     });
 
-                    if (blobsNamesToProcess.length) {
+                    if (blobNamesToProcess.length) {
                         await Promise.all(
-                            blobsNamesToProcess.map(
-                                throat(50, (blobsNameToProcess) => {
+                            blobNamesToProcess.map(
+                                throat(50, (blobNameToProcess) => {
                                     this.logService.log(
                                         'AzureStorageService.iterateAndQueueBlobsByType',
-                                        `Queued ${blobsNameToProcess}`
+                                        `Queued ${blobNameToProcess}`
                                     );
 
                                     totalQueued++;
 
-                                    return this.queueMessage(blobsNameToProcess);
+                                    return this.queueMessage(blobNameToProcess);
                                 })
                             )
                         );
 
                         await Promise.all(
-                            blobsNamesToProcess.map(
-                                throat(50, (blobsNameToProcess) => {
+                            blobNamesToProcess.map(
+                                throat(50, (blobNameToProcess) => {
                                     this.logService.log(
                                         'AzureStorageService.iterateAndQueueBlobsByType',
-                                        `Set redis ${blobsNameToProcess}`
+                                        `Set redis ${blobNameToProcess}`
                                     );
 
-                                    return this.redisService.set(blobsNameToProcess, 1);
+                                    return this.redisService.set(blobNameToProcess, 1);
                                 })
                             )
                         );
