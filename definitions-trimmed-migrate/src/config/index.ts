@@ -1,5 +1,6 @@
 import { AzureStorageOptions } from '../services/azure-storage-service/types';
 import { LogService } from '../services/log-service/LogService';
+import { MigrationServiceOptions } from '../services/migration-service/types';
 import { MongoOptions } from '../services/mongo-service/types';
 import { RedisOptions } from '../services/redis-service/types';
 import { AppConfig } from './types';
@@ -8,6 +9,7 @@ export const config: AppConfig = {
     azureStorageOptions: {
         queueConnectionString: process.env.AZURE_QUEUE_CONNECTION_STRING,
         queueName: process.env.AZURE_QUEUE_NAME,
+        queueDefinitionsToLowercaseName: process.env.AZURE_QUEUE_DEFINITIONS_TO_LOWERCASE_NAME,
         queueDequeueBatchSize: process.env.AZURE_QUEUE_DEQUEUE_BATCH_SIZE,
         blobConnectionString: process.env.AZURE_BLOB_CONNECTION_STRING,
         blobContainerName: process.env.AZURE_BLOB_CONTAINER_NAME,
@@ -25,7 +27,10 @@ export const config: AppConfig = {
         connectionString: process.env.APPLICATIONINSIGHTS_CONNECTION_STRING,
     } as { connectionString: string },
     expressOptions: { port: process.env.PORT } as { port: number | string },
-    migrationOptions: { process: process.env.MIGRATION_PROCESS } as { process: string },
+    migrationOptions: {
+        process: process.env.MIGRATION_PROCESS,
+        componentType: process.env.MIGRATION_PROCESS_COMPONENT_TYPE,
+    } as MigrationServiceOptions,
 };
 
 export const validateAppConfig = (config: AppConfig, logService: LogService) => {

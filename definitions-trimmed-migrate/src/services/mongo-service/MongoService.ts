@@ -1,7 +1,8 @@
-import { Db, MongoClient } from 'mongodb';
+import { Db, MongoClient, Sort } from 'mongodb';
 
 import { LogService } from '../log-service/LogService';
 import { MongoOptions } from './types';
+import { DefinitionTrimmed } from '../migration-service/types';
 
 export class MongoService {
     private client: MongoClient;
@@ -33,6 +34,59 @@ export class MongoService {
             this.logService.log('MongoService.disconnect', 'Disconnected from MongoDB');
         } catch (err) {
             this.logService.error('MongoService.disconnect', err, {
+                exception: err as Error,
+            });
+
+            throw err;
+        }
+    }
+
+    public async find<T>(collection: string, query: Object = {}, sort: Sort, limit = 100) {
+        const results: DefinitionTrimmed[] = [];
+        let count = 0;
+
+        try {
+            const cursor = this.db.collection(collection).find<T>(query).sort(sort).limit(limit);
+
+            await cursor.forEach((d: any) => {
+                results.push(d);
+                console.log(`Processed ${++count} - ${d._id}`);
+            });
+
+            return results;
+        } catch (err) {
+            this.logService.error('MongoService.find', err, {
+                exception: err as Error,
+            });
+
+            throw err;
+        }
+    }
+
+    public async findPaged<DefinitionTrimmed>(
+        collection: string,
+        query: Object = {},
+        sort: Sort = { _id: 1 },
+        limit: number = 100
+    ) {
+        const results: DefinitionTrimmed[] = [];
+        let count = 0;
+
+        try {
+            const cursor = this.db
+                .collection(collection)
+                .find<DefinitionTrimmed>(query)
+                .sort(sort)
+                .limit(limit);
+
+            await cursor.forEach((d: any) => {
+                results.push(d);
+                console.log(`Found ${++count} - ${d._id}`);
+            });
+
+            return results;
+        } catch (err) {
+            this.logService.error('MongoService.findPaged', err, {
                 exception: err as Error,
             });
 
@@ -75,4 +129,28 @@ export class MongoService {
             throw err;
         }
     }
+
+    public async deleteOne<T>(collection: string, filter: Object) {
+        try {
+            return await this.db.collection(collection).deleteOne(filter);
+        } catch (err) {
+            this.logService.error('MongoService.deleteOne', err, {
+                exception: err as Error,
+            });
+
+            throw err;
+        }
+    }
+
+    // public async updateOne<T>(collection: string, filter: Object) {
+    //     try {
+    //         return await this.db.collection(collection).updateOne(filter);
+    //     } catch (err) {
+    //         this.logService.error('MongoService.deleteOne', err, {
+    //             exception: err as Error,
+    //         });
+
+    //         throw err;
+    //     }
+    // }
 }
